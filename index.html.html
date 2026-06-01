@@ -1,0 +1,1055 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Waiter Portal</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:      #080808;
+  --s1:      #111111;
+  --s2:      #181818;
+  --s3:      #212121;
+  --s4:      #2A2A2A;
+  --bd:      rgba(255,255,255,0.07);
+  --bd2:     rgba(255,255,255,0.13);
+  --gold:    #C8922A;
+  --gold-l:  #E8B84B;
+  --gold-d:  rgba(200,146,42,0.13);
+  --text:    #F0EBE2;
+  --tm:      #8A8070;
+  --td:      #4E4840;
+  --green:   #3D9B6A;
+  --green-d: rgba(61,155,106,0.14);
+  --blue:    #4A7FC8;
+  --blue-d:  rgba(74,127,200,0.14);
+  --red:     #C04040;
+  --red-d:   rgba(192,64,64,0.14);
+  --amber:   #C8922A;
+  --amber-d: rgba(200,146,42,0.14);
+  --r:       12px;
+  --rs:      8px;
+}
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html, body { height:100%; overflow:hidden; }
+body { background:var(--bg); color:var(--text); font-family:'DM Sans',sans-serif; font-size:14px; line-height:1.5; }
+
+/* ── LOGIN ── */
+#login-overlay { position:fixed; inset:0; background:var(--bg); z-index:1000; display:flex; align-items:center; justify-content:center; }
+.login-wrap { width:360px; max-width:92vw; background:var(--s1); border:1px solid var(--bd); border-radius:20px; padding:44px 36px; text-align:center; }
+.login-logo { font-family:'Cormorant Garamond',serif; font-size:40px; font-weight:700; color:var(--gold); letter-spacing:6px; margin-bottom:4px; }
+.login-role { font-size:10px; letter-spacing:3.5px; text-transform:uppercase; color:var(--td); margin-bottom:36px; }
+.login-field { width:100%; background:var(--s2); border:1px solid var(--bd); border-radius:var(--r); color:var(--text); font-size:15px; font-family:'DM Sans',sans-serif; padding:13px 16px; outline:none; transition:border-color .2s; margin-bottom:12px; }
+.login-field:focus { border-color:rgba(200,146,42,.45); }
+.login-field::placeholder { color:var(--td); }
+.login-err { font-size:12px; color:var(--red); min-height:18px; margin-bottom:10px; }
+.btn-login { width:100%; background:var(--gold); color:#0A0A0A; border:none; border-radius:var(--r); padding:13px; font-size:14px; font-weight:700; font-family:'DM Sans',sans-serif; cursor:pointer; transition:background .2s; letter-spacing:.5px; }
+.btn-login:hover { background:var(--gold-l); }
+.btn-login:disabled { opacity:.5; cursor:not-allowed; }
+.cf-wrap { margin-bottom:14px; display:flex; justify-content:center; }
+
+/* ── APP SHELL ── */
+#waiter-app { display:none; height:100vh; flex-direction:column; }
+
+/* ── TOPBAR ── */
+#topbar { background:var(--s1); border-bottom:1px solid var(--bd); padding:0 18px; height:54px; display:flex; align-items:center; gap:14px; flex-shrink:0; z-index:10; }
+.tb-brand { font-family:'Cormorant Garamond',serif; font-size:20px; font-weight:700; color:var(--gold); letter-spacing:3px; }
+.tb-role { font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--td); background:var(--s3); border:1px solid var(--bd); border-radius:100px; padding:3px 10px; }
+.tb-spacer { flex:1; }
+.tb-time { font-size:12px; color:var(--td); font-family:'DM Mono',monospace; }
+.tb-logout { font-size:12px; color:var(--tm); background:none; border:none; cursor:pointer; padding:5px 10px; border-radius:var(--rs); transition:background .15s; }
+.tb-logout:hover { background:var(--s3); }
+
+/* ── NAV TABS ── */
+#nav-tabs { background:var(--s1); border-bottom:1px solid var(--bd); display:flex; padding:0 18px; gap:2px; overflow-x:auto; scrollbar-width:none; flex-shrink:0; }
+#nav-tabs::-webkit-scrollbar { display:none; }
+.nav-tab { padding:11px 16px; border:none; background:transparent; color:var(--tm); font-size:13px; font-weight:500; cursor:pointer; white-space:nowrap; border-bottom:2px solid transparent; margin-bottom:-1px; transition:all .2s; font-family:'DM Sans',sans-serif; display:flex; align-items:center; gap:6px; }
+.nav-tab.active { color:var(--gold); border-bottom-color:var(--gold); font-weight:600; }
+.nav-tab:hover:not(.active) { color:var(--text); }
+.tab-badge { background:var(--red); color:#fff; font-size:9px; font-weight:700; min-width:16px; height:16px; border-radius:100px; display:inline-flex; align-items:center; justify-content:center; padding:0 4px; }
+
+/* ── PANELS ── */
+.panel { display:none; flex:1; overflow-y:auto; padding:16px; }
+.panel.active { display:block; }
+
+/* ── PAGE HEADER ── */
+.page-hd { display:flex; align-items:center; gap:12px; margin-bottom:16px; flex-wrap:wrap; }
+.page-title { font-family:'Cormorant Garamond',serif; font-size:26px; font-weight:700; color:var(--text); }
+
+/* ── CALL ALERT OVERLAY ── */
+#call-alert-overlay {
+  position:fixed; inset:0; z-index:2000;
+  background:rgba(0,0,0,0.92);
+  display:none; flex-direction:column;
+  align-items:center; justify-content:center;
+  text-align:center; padding:32px;
+}
+#call-alert-overlay.ringing { display:flex; }
+.call-alert-icon {
+  font-size:80px; margin-bottom:20px;
+  animation:ringBounce 0.5s ease-in-out infinite alternate;
+}
+@keyframes ringBounce {
+  from { transform:scale(1) rotate(-8deg); }
+  to   { transform:scale(1.1) rotate(8deg); }
+}
+.call-alert-title {
+  font-family:'Cormorant Garamond',serif;
+  font-size:36px; font-weight:700;
+  color:var(--gold); margin-bottom:8px;
+}
+.call-alert-sub {
+  font-size:16px; color:var(--tm);
+  margin-bottom:10px; line-height:1.6;
+}
+.call-alert-table {
+  font-family:'DM Mono',monospace;
+  font-size:48px; font-weight:700;
+  color:var(--text); margin-bottom:32px;
+  letter-spacing:2px;
+}
+.call-alert-pulse {
+  width:120px; height:120px; border-radius:50%;
+  background:rgba(200,146,42,0.15);
+  position:absolute;
+  animation:alertPulse 1.2s ease-out infinite;
+}
+@keyframes alertPulse {
+  0%   { transform:scale(0.8); opacity:1; }
+  100% { transform:scale(2.2); opacity:0; }
+}
+.btn-acknowledge {
+  background:var(--gold); color:#0A0A0A;
+  border:none; border-radius:var(--r);
+  padding:18px 48px; font-size:16px;
+  font-weight:700; font-family:'DM Sans',sans-serif;
+  cursor:pointer; transition:all .2s;
+  letter-spacing:.5px; position:relative; z-index:1;
+}
+.btn-acknowledge:hover { background:var(--gold-l); transform:scale(1.03); }
+
+/* ── FILTER BAR ── */
+.filter-bar { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:14px; }
+.fbtn { padding:6px 14px; border-radius:100px; border:1px solid var(--bd); background:var(--s2); color:var(--tm); font-size:12px; font-weight:500; cursor:pointer; transition:all .15s; font-family:'DM Sans',sans-serif; }
+.fbtn.active { background:var(--gold); color:#0A0A0A; border-color:var(--gold); font-weight:700; }
+
+/* ── ORDER CARDS ── */
+.order-card { background:var(--s2); border:1px solid var(--bd); border-radius:var(--r); margin-bottom:10px; overflow:hidden; transition:border-color .2s; }
+.order-card.status-ready { border-left:3px solid var(--green); }
+.order-card.status-served { border-left:3px solid var(--td); opacity:.65; }
+.order-card.urgent { border-color:var(--gold); animation:urgentPulse 2s ease-in-out infinite; }
+@keyframes urgentPulse { 0%,100%{box-shadow:0 0 0 0 transparent;} 50%{box-shadow:0 0 0 5px rgba(200,146,42,.15);} }
+
+.oc-head { padding:12px 16px; display:flex; align-items:center; gap:10px; border-bottom:1px solid var(--bd); flex-wrap:wrap; }
+.oc-num { font-family:'DM Mono',monospace; font-size:13px; font-weight:500; color:var(--gold); }
+.oc-type { font-size:11px; font-weight:600; letter-spacing:.5px; text-transform:uppercase; color:var(--tm); }
+.oc-table { background:var(--gold-d); border:1px solid rgba(200,146,42,.3); border-radius:100px; font-size:11px; font-weight:700; color:var(--gold); padding:2px 10px; }
+.oc-time { font-size:11px; color:var(--td); margin-left:auto; font-family:'DM Mono',monospace; }
+
+.oc-items { padding:12px 16px; border-bottom:1px solid var(--bd); }
+.oc-item-row { display:flex; align-items:flex-start; gap:10px; padding:5px 0; border-bottom:1px solid var(--bd); }
+.oc-item-row:last-child { border-bottom:none; }
+.oc-qty { min-width:28px; height:28px; background:var(--s3); border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; color:var(--gold); flex-shrink:0; }
+.oc-item-name { flex:1; font-size:13px; font-weight:500; }
+
+.oc-foot { padding:10px 16px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.oc-elapsed { font-size:11px; color:var(--td); font-family:'DM Mono',monospace; margin-right:auto; }
+.oc-elapsed.warn { color:var(--amber); }
+.oc-elapsed.late { color:var(--red); }
+
+/* ── TABLE GRID ── */
+.table-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(80px,1fr)); gap:10px; margin-bottom:16px; }
+.table-tile { background:var(--s2); border:1px solid var(--bd); border-radius:var(--r); padding:16px 10px; text-align:center; cursor:pointer; transition:all .2s; }
+.table-tile:hover { border-color:var(--bd2); background:var(--s3); }
+.table-tile.occupied { border-color:rgba(200,146,42,.4); background:var(--gold-d); }
+.table-tile.ready    { border-color:rgba(61,155,106,.4); background:var(--green-d); animation:urgentPulse 2s infinite; }
+.table-tile.free     { opacity:.4; }
+.table-num { font-family:'Cormorant Garamond',serif; font-size:24px; font-weight:700; margin-bottom:4px; }
+.table-status-label { font-size:10px; letter-spacing:1px; text-transform:uppercase; color:var(--td); }
+.table-tile.occupied .table-status-label { color:var(--gold); }
+.table-tile.ready    .table-status-label { color:var(--green); }
+
+/* ── RESERVATION CARDS ── */
+.resv-card { background:var(--s2); border:1px solid var(--bd); border-radius:var(--r); padding:14px 16px; margin-bottom:10px; }
+.resv-card.upcoming { border-left:3px solid var(--gold); }
+.resv-head { display:flex; align-items:center; gap:8px; margin-bottom:8px; flex-wrap:wrap; }
+.resv-name { font-weight:700; font-size:14px; }
+.resv-time { font-size:12px; color:var(--tm); margin-left:auto; font-family:'DM Mono',monospace; }
+.resv-meta { display:flex; gap:14px; flex-wrap:wrap; font-size:12.5px; color:var(--tm); }
+.resv-meta span b { color:var(--text); }
+
+/* ── BADGES ── */
+.badge { display:inline-flex; align-items:center; padding:3px 9px; border-radius:100px; font-size:11px; font-weight:600; letter-spacing:.3px; }
+.badge-amber  { background:var(--amber-d); color:var(--amber); border:1px solid rgba(200,146,42,.25); }
+.badge-blue   { background:var(--blue-d);  color:var(--blue);  border:1px solid rgba(74,127,200,.25); }
+.badge-green  { background:var(--green-d); color:var(--green); border:1px solid rgba(61,155,106,.25); }
+.badge-grey   { background:var(--s3);      color:var(--tm);    border:1px solid var(--bd); }
+.badge-red    { background:var(--red-d);   color:var(--red);   border:1px solid rgba(192,64,64,.25); }
+
+/* ── STATUS BUTTONS ── */
+.sbtn { padding:7px 14px; border-radius:var(--rs); border:1px solid var(--bd); background:var(--s3); color:var(--tm); font-size:12px; font-weight:600; cursor:pointer; transition:all .18s; font-family:'DM Sans',sans-serif; white-space:nowrap; }
+.sbtn:hover { background:var(--s4); color:var(--text); }
+.sbtn-serve  { background:var(--green-d); color:var(--green); border-color:rgba(61,155,106,.3); }
+.sbtn-done   { background:var(--s3); color:var(--tm); }
+.sbtn-deliv  { background:var(--blue-d); color:var(--blue); border-color:rgba(74,127,200,.3); }
+
+/* ── EMPTY STATE ── */
+.empty-state { text-align:center; padding:60px 20px; color:var(--td); }
+.empty-state .emoji { font-size:48px; margin-bottom:14px; }
+.empty-state h3 { font-size:16px; font-weight:600; color:var(--tm); margin-bottom:6px; }
+.empty-state p  { font-size:13px; }
+
+/* ── SPINNER ── */
+.spinner { width:30px; height:30px; border:2px solid var(--s4); border-top-color:var(--gold); border-radius:50%; animation:spin .75s linear infinite; margin:40px auto; }
+@keyframes spin { to { transform:rotate(360deg); } }
+
+/* ── BUTTONS ── */
+.btn { padding:9px 18px; border-radius:var(--rs); border:1px solid var(--bd); background:var(--s3); color:var(--text); font-size:13px; font-weight:600; cursor:pointer; transition:all .18s; font-family:'DM Sans',sans-serif; display:inline-flex; align-items:center; gap:6px; white-space:nowrap; }
+.btn:hover { background:var(--s4); }
+.btn:disabled { opacity:.45; cursor:not-allowed; }
+.btn-gold  { background:var(--gold); color:#0A0A0A; border-color:var(--gold); }
+.btn-gold:hover { background:var(--gold-l); }
+.btn-ghost { background:transparent; }
+.btn-ghost:hover { background:var(--s3); }
+.btn-sm { padding:6px 12px; font-size:12px; }
+.btn-full { width:100%; justify-content:center; }
+
+/* ── TOAST ── */
+#toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(80px); background:var(--s1); border:1px solid var(--bd); border-radius:100px; padding:10px 20px; font-size:13px; font-weight:500; transition:transform .3s cubic-bezier(.34,1.56,.64,1), opacity .3s; opacity:0; z-index:9999; white-space:nowrap; pointer-events:none; max-width:90vw; text-align:center; }
+#toast.show { transform:translateX(-50%) translateY(0); opacity:1; }
+#toast.t-success { border-color:rgba(61,155,106,.4); color:var(--green); }
+#toast.t-error   { border-color:rgba(192,64,64,.4);  color:var(--red); }
+
+/* ── RESPONSIVE ── */
+@media(max-width:480px) {
+  #topbar { padding:0 12px; }
+  .panel  { padding:12px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ══ LOGIN OVERLAY ═══════════════════════════════════ -->
+<div id="login-overlay">
+  <div class="login-wrap">
+    <div class="login-logo" id="login-logo">GRISTO</div>
+    <div class="login-role">Waiter Portal</div>
+    <input type="email" id="login-email" class="login-field" placeholder="Email address"
+      onkeydown="if(event.key==='Enter')document.getElementById('login-pw').focus()">
+    <input type="password" id="login-pw" class="login-field" placeholder="Password"
+      onkeydown="if(event.key==='Enter')tryWaiterLogin()">
+    <div class="cf-wrap">
+      <div class="cf-turnstile"
+        data-sitekey="0x4AAAAAAA_REPLACE_WITH_YOUR_SITEKEY"
+        data-theme="dark"
+        data-callback="onTurnstileSuccess"></div>
+    </div>
+    <div class="login-err" id="login-err"></div>
+    <button class="btn-login" id="login-btn" onclick="tryWaiterLogin()" disabled>Sign In →</button>
+  </div>
+</div>
+
+<!-- ══ WAITER APP ══════════════════════════════════════ -->
+<div id="waiter-app">
+
+  <!-- TOPBAR -->
+  <div id="topbar">
+    <div class="tb-brand" id="tb-brand">GRISTO</div>
+    <div class="tb-role">Waiter</div>
+    <div class="tb-spacer"></div>
+    <div class="tb-time" id="tb-time"></div>
+    <button class="tb-logout" onclick="waiterLogout()">Sign Out</button>
+  </div>
+
+  <!-- NAV TABS -->
+  <div id="nav-tabs">
+    <button class="nav-tab active" id="tab-calls-btn" onclick="switchTab('calls')">
+      📞 Calls <span class="tab-badge" id="calls-badge" style="display:none">0</span>
+    </button>
+    <button class="nav-tab" id="tab-orders-btn" onclick="switchTab('orders')">
+      🍽 My Orders <span class="tab-badge" id="orders-badge" style="display:none">0</span>
+    </button>
+    <button class="nav-tab" id="tab-tables-btn" onclick="switchTab('tables')">
+      🪑 Tables
+    </button>
+    <button class="nav-tab" id="tab-reservations-btn" onclick="switchTab('reservations')">
+      📅 Reservations
+    </button>
+  </div>
+
+  <!-- ── CALLS PANEL ─────────────────────────── -->
+  <div class="panel active" id="panel-calls">
+    <div class="page-hd">
+      <div class="page-title">Incoming Calls</div>
+      <button class="btn btn-ghost btn-sm" onclick="clearDoneCalls()" style="margin-left:auto;">Clear Done</button>
+    </div>
+    <div id="calls-list"><div class="spinner"></div></div>
+  </div>
+
+  <!-- ── ORDERS PANEL ─────────────────────────── -->
+  <div class="panel" id="panel-orders">
+    <div class="page-hd">
+      <div class="page-title">Orders to Serve</div>
+    </div>
+    <div class="filter-bar">
+      <button class="fbtn active" id="of-all"   onclick="setOrderFilter('all')">All</button>
+      <button class="fbtn"        id="of-ready"  onclick="setOrderFilter('ready')">🟢 Ready</button>
+      <button class="fbtn"        id="of-served" onclick="setOrderFilter('served')">Served</button>
+    </div>
+    <div id="orders-list"><div class="spinner"></div></div>
+  </div>
+
+  <!-- ── TABLES PANEL ─────────────────────────── -->
+  <div class="panel" id="panel-tables">
+    <div class="page-hd">
+      <div class="page-title">Table Overview</div>
+    </div>
+    <div id="table-grid-wrap"><div class="spinner"></div></div>
+  </div>
+
+  <!-- ── RESERVATIONS PANEL ───────────────────── -->
+  <div class="panel" id="panel-reservations">
+    <div class="page-hd">
+      <div class="page-title">Today's Reservations</div>
+    </div>
+    <div class="filter-bar">
+      <button class="fbtn active" id="rf-upcoming"  onclick="setResvFilter('upcoming')">Upcoming</button>
+      <button class="fbtn"        id="rf-confirmed"  onclick="setResvFilter('confirmed')">Confirmed</button>
+      <button class="fbtn"        id="rf-all"        onclick="setResvFilter('all')">All</button>
+    </div>
+    <div id="reservations-list"><div class="spinner"></div></div>
+  </div>
+
+</div><!-- /waiter-app -->
+
+<!-- ══ CALL ALERT OVERLAY (RINGS UNTIL ACKNOWLEDGED) ═══ -->
+<div id="call-alert-overlay">
+  <div class="call-alert-pulse"></div>
+  <div class="call-alert-pulse" style="animation-delay:.4s;"></div>
+  <div class="call-alert-icon">📞</div>
+  <div class="call-alert-title">Chef is Calling</div>
+  <div class="call-alert-sub" id="call-alert-sub">Kitchen needs your attention</div>
+  <div class="call-alert-table" id="call-alert-table">T—</div>
+  <button class="btn-acknowledge" onclick="acknowledgeCall()">✓ Acknowledge</button>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+
+<!-- Cloudflare Turnstile -->
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+
+<script>
+// ════════════════════════════════════════════
+// FIREBASE CONFIG — replace per restaurant
+// ════════════════════════════════════════════
+const firebaseConfig = {
+  apiKey:            "REPLACE_WITH_YOUR_API_KEY",
+  authDomain:        "REPLACE_WITH_YOUR_AUTH_DOMAIN",
+  projectId:         "REPLACE_WITH_YOUR_PROJECT_ID",
+  storageBucket:     "REPLACE_WITH_YOUR_STORAGE_BUCKET",
+  messagingSenderId: "REPLACE_WITH_YOUR_SENDER_ID",
+  appId:             "REPLACE_WITH_YOUR_APP_ID"
+};
+
+let db = null;
+try {
+  firebase.initializeApp(firebaseConfig);
+  db = firebase.firestore();
+} catch(e) { console.warn('Firebase:', e.message); }
+
+// ── STATE ─────────────────────────────────────
+let _turnstileToken    = null;
+let currentUser        = null;
+let currentEmployee    = null;
+let allOrders          = [];
+let allReservations    = [];
+let settings           = {};
+let orderFilter        = 'all';
+let resvFilter         = 'upcoming';
+let ordersListener     = null;
+let callsListener      = null;
+let settingsListener   = null;
+let resvListener       = null;
+let activeCallId       = null;  // currently ringing call doc ID
+let ringInterval       = null;  // interval for ringing sound
+
+const STATUS_LABELS = {
+  received:'New', pending:'New', confirmed:'Confirmed',
+  preparing:'Preparing', ready:'Ready', served:'Served',
+  picked_up:'Picked Up', delivered:'Delivered', completed:'Done'
+};
+const STATUS_COLORS = {
+  received:'amber', pending:'amber', confirmed:'blue',
+  preparing:'amber', ready:'green', served:'grey',
+  picked_up:'grey', delivered:'grey', completed:'grey'
+};
+
+// ── TURNSTILE ─────────────────────────────────
+function onTurnstileSuccess(token) {
+  _turnstileToken = token;
+  const btn = document.getElementById('login-btn');
+  btn.disabled = false; btn.style.opacity = '1';
+}
+
+// ── HASH EMAIL ────────────────────────────────
+async function hashEmail(email) {
+  const normalized = email.trim().toLowerCase();
+  const buf  = new TextEncoder().encode(normalized);
+  const hash = await crypto.subtle.digest('SHA-256', buf);
+  return Array.from(new Uint8Array(hash)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+// ── LOGIN ─────────────────────────────────────
+async function tryWaiterLogin() {
+  if (!_turnstileToken) { showLoginErr('Please complete the human check.'); return; }
+  const email = document.getElementById('login-email').value.trim().toLowerCase();
+  const pw    = document.getElementById('login-pw').value;
+  if (!email) { showLoginErr('Enter your email'); return; }
+  if (!pw)    { showLoginErr('Enter your password'); return; }
+
+  const btn = document.getElementById('login-btn');
+  btn.disabled = true; btn.textContent = 'Checking…';
+
+  try {
+    // STEP 1 — role check BEFORE auth — zero wrong access
+    const hash     = await hashEmail(email);
+    const roleSnap = await db.collection('employee_roles').doc(hash).get();
+
+    if (!roleSnap.exists) {
+      showLoginErr('No account found for this email.'); resetLoginBtn(); return;
+    }
+
+    const roleData = roleSnap.data();
+
+    if (!['waiter','superadmin','admin'].includes(roleData.role)) {
+      showLoginErr('Access denied. This portal is for waiters only.'); resetLoginBtn(); return;
+    }
+
+    if (roleData.active === false || roleData.frozen === true) {
+      showLoginErr('Your access has been suspended. Contact your manager.'); resetLoginBtn(); return;
+    }
+
+    // STEP 2 — role confirmed, authenticate
+    btn.textContent = 'Signing in…';
+    await firebase.auth().signInWithEmailAndPassword(email, pw);
+
+  } catch(e) {
+    const msg = e.code === 'auth/wrong-password' || e.code === 'auth/user-not-found'
+      ? 'Incorrect email or password' : e.message;
+    showLoginErr(msg);
+    resetLoginBtn();
+    _turnstileToken = null;
+    if (window.turnstile) turnstile.reset();
+  }
+}
+
+function showLoginErr(msg) {
+  const el = document.getElementById('login-err');
+  el.textContent = msg;
+  setTimeout(() => { if (el.textContent === msg) el.textContent = ''; }, 3500);
+}
+
+function resetLoginBtn() {
+  const btn = document.getElementById('login-btn');
+  btn.disabled = false; btn.textContent = 'Sign In →';
+}
+
+// ── AUTH STATE ────────────────────────────────
+firebase.auth().onAuthStateChanged(async user => {
+  if (user) {
+    currentUser = user;
+
+    // Re-verify role every auth state change
+    const hash     = await hashEmail(user.email);
+    const roleSnap = await db.collection('employee_roles').doc(hash).get();
+
+    if (!roleSnap.exists
+      || !['waiter','superadmin','admin'].includes(roleSnap.data().role)
+      || roleSnap.data().active === false
+      || roleSnap.data().frozen === true) {
+      await firebase.auth().signOut();
+      showLoginErr('Your access has been revoked. Contact your manager.');
+      return;
+    }
+
+    const empSnap = await db.collection('employees').doc(user.uid).get();
+    currentEmployee = empSnap.exists ? empSnap.data() : { name: user.email, role:'waiter' };
+
+    writePresence(true);
+    window.addEventListener('beforeunload', () => writePresence(false));
+
+    document.getElementById('login-overlay').style.display  = 'none';
+    document.getElementById('waiter-app').style.display     = 'flex';
+    initWaiterApp();
+
+    // Real-time freeze check — kicks out immediately if frozen
+    db.collection('employee_roles').doc(hash).onSnapshot(snap => {
+      if (!snap.exists) { firebase.auth().signOut(); return; }
+      const d = snap.data();
+      if (d.active === false || d.frozen === true) {
+        stopRinging();
+        showFreezeAlert();
+        setTimeout(() => firebase.auth().signOut(), 4000);
+      }
+    });
+
+  } else {
+    currentUser = null; currentEmployee = null;
+    stopRinging();
+    document.getElementById('waiter-app').style.display    = 'none';
+    document.getElementById('login-overlay').style.display = 'flex';
+    if (ordersListener)   { ordersListener();   ordersListener = null; }
+    if (callsListener)    { callsListener();     callsListener = null; }
+    if (settingsListener) { settingsListener();  settingsListener = null; }
+    if (resvListener)     { resvListener();      resvListener = null; }
+  }
+});
+
+function writePresence(online) {
+  if (!db || !currentUser) return;
+  db.collection('presence').doc(currentUser.uid).set({
+    online, portal:'waiter',
+    lastSeen: firebase.firestore.FieldValue.serverTimestamp()
+  });
+}
+
+function waiterLogout() {
+  writePresence(false);
+  stopRinging();
+  firebase.auth().signOut();
+}
+
+function showFreezeAlert() {
+  stopRinging();
+  document.getElementById('call-alert-overlay').classList.remove('ringing');
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.9);z-index:3000;display:flex;align-items:center;justify-content:center;text-align:center;padding:32px;';
+  overlay.innerHTML = `<div><div style="font-size:52px;margin-bottom:16px;">🔒</div><div style="font-family:\'Cormorant Garamond\',serif;font-size:28px;color:var(--gold);margin-bottom:8px;">Access Suspended</div><div style="color:var(--tm);font-size:14px;">Contact your manager.</div></div>`;
+  document.body.appendChild(overlay);
+}
+
+// ── INIT ──────────────────────────────────────
+function initWaiterApp() {
+  tickTime();
+  setInterval(tickTime, 30000);
+  startSettingsListener();
+  startCallsListener();
+  startOrdersListener();
+  startResvListener();
+}
+
+function tickTime() {
+  const t = new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  const el = document.getElementById('tb-time');
+  if (el) el.textContent = t;
+}
+
+// ── SETTINGS LISTENER ─────────────────────────
+function startSettingsListener() {
+  if (!db) return;
+  settingsListener = db.collection('settings').doc('global').onSnapshot(snap => {
+    if (!snap.exists) return;
+    settings = { ...settings, ...snap.data() };
+
+    // Sync restaurant name in real time
+    const name = settings.restaurantName || 'Gristo';
+    document.getElementById('tb-brand').textContent   = name;
+    document.getElementById('login-logo').textContent = name;
+    document.title = name + ' — Waiter Portal';
+
+    // Sync brand colors in real time
+    if (settings.brandColors) {
+      const applyTo = settings.applyBrandTo || 'both';
+      if (['waiter','both','all'].includes(applyTo)) {
+        applyBrandColors(settings.brandColors);
+      }
+    }
+
+    // Rebuild table grid if on tables tab
+    if (document.getElementById('panel-tables').classList.contains('active')) {
+      renderTableGrid();
+    }
+  });
+}
+
+function applyBrandColors(bc) {
+  const root = document.documentElement;
+  if (bc.primary) {
+    const r = parseInt(bc.primary.slice(1,3),16);
+    const g = parseInt(bc.primary.slice(3,5),16);
+    const b = parseInt(bc.primary.slice(5,7),16);
+    root.style.setProperty('--gold',    bc.primary);
+    root.style.setProperty('--gold-l',  lightenHex(bc.primary, 30));
+    root.style.setProperty('--gold-d',  `rgba(${r},${g},${b},0.13)`);
+    root.style.setProperty('--amber',   bc.primary);
+    root.style.setProperty('--amber-d', `rgba(${r},${g},${b},0.14)`);
+  }
+  if (bc.bg)      root.style.setProperty('--bg',   bc.bg);
+  if (bc.surface) {
+    root.style.setProperty('--s1', bc.surface);
+    root.style.setProperty('--s2', bc.surface);
+  }
+  if (bc.text)    root.style.setProperty('--text', bc.text);
+}
+
+function lightenHex(hex, amt) {
+  const num = parseInt(hex.replace('#',''),16);
+  const r = Math.min(255,(num>>16)+amt);
+  const g = Math.min(255,((num>>8)&0xff)+amt);
+  const b = Math.min(255,(num&0xff)+amt);
+  return '#'+[r,g,b].map(v=>v.toString(16).padStart(2,'0')).join('');
+}
+
+// ── TABS ─────────────────────────────────────
+function switchTab(t) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
+  document.getElementById(`panel-${t}`).classList.add('active');
+  document.getElementById(`tab-${t}-btn`).classList.add('active');
+  if (t === 'orders')       renderOrders();
+  if (t === 'tables')       renderTableGrid();
+  if (t === 'reservations') renderReservations();
+  if (t === 'calls')        renderCallList();
+}
+
+// ══════════════════════════════════════════════
+// ★ CALL SYSTEM — rings until acknowledged
+// ══════════════════════════════════════════════
+let _knownCallIds = new Set();
+
+function startCallsListener() {
+  if (!db) return;
+  const cutoff = new Date(); cutoff.setHours(0,0,0,0);
+
+  callsListener = db.collection('waiter_calls')
+    .where('calledAt', '>=', firebase.firestore.Timestamp.fromDate(cutoff))
+    .where('status', '==', 'ringing')
+    .onSnapshot(snap => {
+      const ringing = snap.docs.filter(d => d.data().acknowledged === false);
+      const badge   = document.getElementById('calls-badge');
+      if (badge) {
+        badge.textContent  = ringing.length;
+        badge.style.display = ringing.length ? 'inline-flex' : 'none';
+      }
+
+      // Show ring alert for first unacknowledged call not yet shown
+      const newCall = snap.docChanges().find(c =>
+        c.type === 'added' && !_knownCallIds.has(c.doc.id) && !c.doc.data().acknowledged
+      );
+      if (newCall) {
+        _knownCallIds.add(newCall.doc.id);
+        showCallAlert(newCall.doc.id, newCall.doc.data());
+      }
+
+      snap.docs.forEach(d => _knownCallIds.add(d.id));
+
+      // If current ringing call was acknowledged by someone else, stop ringing
+      if (activeCallId) {
+        const stillRinging = snap.docs.find(d => d.id === activeCallId && !d.data().acknowledged);
+        if (!stillRinging) stopRinging();
+      }
+
+      if (document.getElementById('panel-calls').classList.contains('active')) renderCallList();
+    }, e => console.warn('calls listener:', e));
+}
+
+function showCallAlert(callId, callData) {
+  activeCallId = callId;
+  const sub   = `Order #${callData.orderNumber}${callData.tableNumber ? ' · ' + callData.calledBy : ''}`;
+  const table = callData.tableNumber ? `Table ${callData.tableNumber}` : 'Counter';
+
+  document.getElementById('call-alert-sub').textContent   = sub;
+  document.getElementById('call-alert-table').textContent = table;
+  document.getElementById('call-alert-overlay').classList.add('ringing');
+
+  startRinging();
+}
+
+async function acknowledgeCall() {
+  if (!activeCallId || !db) return;
+  try {
+    await db.collection('waiter_calls').doc(activeCallId).update({
+      status:         'acknowledged',
+      acknowledged:   true,
+      acknowledgedBy: currentEmployee?.name || 'Waiter',
+      acknowledgedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    stopRinging();
+    toast('Call acknowledged', 'success');
+  } catch(e) {
+    toast('Error acknowledging call', 'error');
+  }
+}
+
+function stopRinging() {
+  activeCallId = null;
+  document.getElementById('call-alert-overlay').classList.remove('ringing');
+  if (ringInterval) { clearInterval(ringInterval); ringInterval = null; }
+}
+
+function startRinging() {
+  if (ringInterval) clearInterval(ringInterval);
+  playRingChime();
+  ringInterval = setInterval(playRingChime, 2500);
+}
+
+function playRingChime() {
+  try {
+    const ctx  = new (window.AudioContext || window.webkitAudioContext)();
+    const freqs = [880, 660, 880, 660];
+    freqs.forEach((freq, i) => {
+      const osc  = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.frequency.value = freq;
+      osc.type = 'sine';
+      const t = ctx.currentTime + i * 0.15;
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.3, t + 0.04);
+      gain.gain.linearRampToValueAtTime(0, t + 0.18);
+      osc.start(t); osc.stop(t + 0.2);
+    });
+  } catch(e) {}
+}
+
+function renderCallList() {
+  const con = document.getElementById('calls-list');
+  if (!con || !db) return;
+  const cutoff = new Date(); cutoff.setHours(0,0,0,0);
+  db.collection('waiter_calls')
+    .where('calledAt','>=', firebase.firestore.Timestamp.fromDate(cutoff))
+    .orderBy('calledAt','desc')
+    .get()
+    .then(snap => {
+      if (!snap.docs.length) {
+        con.innerHTML = `<div class="empty-state"><div class="emoji">📞</div><h3>No calls today</h3><p>Chef calls appear here in real time</p></div>`;
+        return;
+      }
+      con.innerHTML = '';
+      snap.docs.forEach(d => {
+        const c   = d.data();
+        const ts  = c.calledAt?.seconds ? new Date(c.calledAt.seconds*1000) : new Date();
+        const ack = c.acknowledged;
+        const div = document.createElement('div');
+        div.style.cssText = `background:var(--s2);border:1px solid ${ack?'var(--bd)':'rgba(200,146,42,.35)'};border-radius:var(--r);padding:14px 16px;margin-bottom:8px;display:flex;align-items:center;gap:12px;`;
+        div.innerHTML = `
+          <span style="font-size:24px;">${ack ? '✅' : '📞'}</span>
+          <div style="flex:1;">
+            <div style="font-size:13px;font-weight:700;">Order #${c.orderNumber}${c.tableNumber?' · Table '+c.tableNumber:''}</div>
+            <div style="font-size:12px;color:var(--tm);">Called by ${c.calledBy||'Chef'} at ${ts.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</div>
+            ${ack
+              ? `<div style="font-size:12px;color:var(--green);font-weight:600;margin-top:2px;">✓ Acknowledged by ${c.acknowledgedBy||'You'}</div>`
+              : `<div style="font-size:12px;color:var(--gold);font-weight:600;margin-top:2px;">🔔 Waiting for acknowledgement</div>`}
+          </div>
+          ${!ack ? `<button class="sbtn sbtn-serve" onclick="manualAck('${d.id}')">Ack</button>` : ''}`;
+        con.appendChild(div);
+      });
+    });
+}
+
+async function manualAck(callId) {
+  if (!db) return;
+  await db.collection('waiter_calls').doc(callId).update({
+    status:'acknowledged', acknowledged:true,
+    acknowledgedBy: currentEmployee?.name || 'Waiter',
+    acknowledgedAt: firebase.firestore.FieldValue.serverTimestamp(),
+  }).catch(e => console.warn(e));
+}
+
+async function clearDoneCalls() {
+  if (!db) return;
+  const snap = await db.collection('waiter_calls').where('acknowledged','==',true).get();
+  const batch = db.batch();
+  snap.docs.forEach(d => batch.delete(d.ref));
+  await batch.commit().catch(e => console.warn(e));
+  toast('Cleared acknowledged calls');
+  renderCallList();
+}
+
+// ══════════════════════════════════════════════
+// ★ ORDERS
+// ══════════════════════════════════════════════
+function startOrdersListener() {
+  if (!db) return;
+  const cutoff = new Date(); cutoff.setHours(0,0,0,0);
+
+  ordersListener = db.collection('orders')
+    .where('timestamp','>=', firebase.firestore.Timestamp.fromDate(cutoff))
+    .where('orderType','==','dine_in')
+    .orderBy('timestamp','asc')
+    .onSnapshot(snap => {
+      allOrders = snap.docs.map(d => ({ ...d.data(), _id:d.id }))
+        .filter(o => !['completed','delivered','picked_up'].includes(o.status));
+
+      // Badge for ready orders
+      const readyCount = allOrders.filter(o => o.status === 'ready').length;
+      const badge      = document.getElementById('orders-badge');
+      if (badge) { badge.textContent = readyCount; badge.style.display = readyCount ? 'inline-flex' : 'none'; }
+
+      if (document.getElementById('panel-orders').classList.contains('active')) renderOrders();
+      if (document.getElementById('panel-tables').classList.contains('active')) renderTableGrid();
+    }, e => console.warn('orders listener:', e));
+}
+
+function setOrderFilter(f) {
+  orderFilter = f;
+  document.querySelectorAll('#panel-orders .fbtn').forEach(b => b.classList.remove('active'));
+  document.getElementById(`of-${f}`)?.classList.add('active');
+  renderOrders();
+}
+
+function renderOrders() {
+  const con = document.getElementById('orders-list');
+  if (!con) return;
+
+  let list = [...allOrders];
+  if (orderFilter === 'ready')  list = list.filter(o => o.status === 'ready');
+  if (orderFilter === 'served') list = list.filter(o => o.status === 'served');
+
+  if (!list.length) {
+    con.innerHTML = `<div class="empty-state"><div class="emoji">🍽</div><h3>${orderFilter === 'ready' ? 'No orders ready' : 'No orders'}</h3><p>Ready orders from the kitchen appear here</p></div>`;
+    return;
+  }
+
+  con.innerHTML = '';
+  list.forEach(o => {
+    const ts      = o.timestamp?.seconds ? new Date(o.timestamp.seconds*1000) : new Date();
+    const elapsed = Math.floor((Date.now()-ts.getTime())/60000);
+    const elClass = elapsed >= 20 ? 'late' : elapsed >= 12 ? 'warn' : '';
+    const isUrgent = o.status === 'ready' && elapsed >= 8;
+
+    const card = document.createElement('div');
+    card.className = `order-card status-${o.status}${isUrgent ? ' urgent' : ''}`;
+
+    const items = (o.items||[]).map(i =>
+      `<div class="oc-item-row">
+        <div class="oc-qty">${i.qty||1}</div>
+        <div class="oc-item-name">${escHtml(i.name)}</div>
+      </div>`
+    ).join('');
+
+    let btns = '';
+    if (o.status === 'ready') {
+      btns = `<button class="sbtn sbtn-serve" onclick="markServed('${o._id}')">✓ Mark Served</button>`;
+    }
+    if (o.status === 'served') {
+      btns = `<button class="sbtn sbtn-done" onclick="markFinished('${o._id}')">✓ Table Done</button>`;
+    }
+
+    card.innerHTML = `
+      <div class="oc-head">
+        <span class="oc-num">#${o.orderNumber}</span>
+        <span class="oc-table">T${o.tableNumber}</span>
+        <span class="badge badge-${STATUS_COLORS[o.status]||'grey'}">${STATUS_LABELS[o.status]||o.status}</span>
+        ${o.customerName ? `<span style="font-size:12px;color:var(--tm);">${escHtml(o.customerName)}</span>` : ''}
+        <span class="oc-time">${ts.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</span>
+      </div>
+      <div class="oc-items">${items}</div>
+      <div class="oc-foot">
+        <span class="oc-elapsed ${elClass}">⏱ ${elapsed}m ago</span>
+        ${btns}
+      </div>`;
+    con.appendChild(card);
+  });
+}
+
+async function markServed(id) {
+  if (!db) return;
+  await db.collection('orders').doc(id).update({
+    status: 'served',
+    [`statusTimestamps.served`]: firebase.firestore.FieldValue.serverTimestamp(),
+    servedBy:  currentEmployee?.name || 'Waiter',
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+  }).catch(e => console.warn(e));
+  toast('Order marked as served', 'success');
+}
+
+async function markFinished(id) {
+  if (!db) return;
+  await db.collection('orders').doc(id).update({
+    status: 'completed',
+    [`statusTimestamps.completed`]: firebase.firestore.FieldValue.serverTimestamp(),
+    completedBy: currentEmployee?.name || 'Waiter',
+    updatedAt:   firebase.firestore.FieldValue.serverTimestamp()
+  }).catch(e => console.warn(e));
+  toast('Table marked as done', 'success');
+}
+
+// ══════════════════════════════════════════════
+// ★ TABLE OVERVIEW
+// ══════════════════════════════════════════════
+function renderTableGrid() {
+  const wrap = document.getElementById('table-grid-wrap');
+  if (!wrap) return;
+
+  const count = settings.tableCount || 10;
+
+  // Build table status map from orders
+  const tableMap = {};
+  allOrders.forEach(o => {
+    if (!o.tableNumber) return;
+    const t = parseInt(o.tableNumber);
+    if (!tableMap[t] || o.status === 'ready') {
+      tableMap[t] = o.status;
+    }
+  });
+
+  let html = `<div class="table-grid">`;
+  for (let i = 1; i <= count; i++) {
+    const status = tableMap[i];
+    let tileClass = 'table-tile free';
+    let label     = 'Free';
+    if (status === 'ready')     { tileClass = 'table-tile ready';    label = 'Ready!'; }
+    else if (status)            { tileClass = 'table-tile occupied'; label = status.replace('_',' '); }
+    html += `
+      <div class="${tileClass}" onclick="filterByTable(${i})">
+        <div class="table-num">${i}</div>
+        <div class="table-status-label">${label}</div>
+      </div>`;
+  }
+  html += `</div>
+  <p style="font-size:12px;color:var(--td);text-align:center;margin-top:8px;">
+    Tap a table to view its orders
+  </p>`;
+  wrap.innerHTML = html;
+}
+
+function filterByTable(tableNum) {
+  // Switch to orders tab and filter by table
+  switchTab('orders');
+  orderFilter = 'all';
+  document.querySelectorAll('#panel-orders .fbtn').forEach(b => b.classList.remove('active'));
+  document.getElementById('of-all').classList.add('active');
+
+  const con = document.getElementById('orders-list');
+  const tableOrders = allOrders.filter(o => parseInt(o.tableNumber) === tableNum);
+
+  if (!tableOrders.length) {
+    con.innerHTML = `<div class="empty-state"><div class="emoji">🪑</div><h3>Table ${tableNum} is free</h3></div>`;
+    return;
+  }
+
+  // Re-render with table filter
+  const prev = orderFilter;
+  con.innerHTML = '';
+  tableOrders.forEach(o => {
+    const ts      = o.timestamp?.seconds ? new Date(o.timestamp.seconds*1000) : new Date();
+    const elapsed = Math.floor((Date.now()-ts.getTime())/60000);
+    const elClass = elapsed >= 20 ? 'late' : elapsed >= 12 ? 'warn' : '';
+    const items   = (o.items||[]).map(i =>
+      `<div class="oc-item-row"><div class="oc-qty">${i.qty||1}</div><div class="oc-item-name">${escHtml(i.name)}</div></div>`
+    ).join('');
+    let btns = '';
+    if (o.status === 'ready')  btns = `<button class="sbtn sbtn-serve" onclick="markServed('${o._id}')">✓ Mark Served</button>`;
+    if (o.status === 'served') btns = `<button class="sbtn sbtn-done" onclick="markFinished('${o._id}')">✓ Table Done</button>`;
+
+    const card = document.createElement('div');
+    card.className = `order-card status-${o.status}`;
+    card.innerHTML = `
+      <div class="oc-head">
+        <span class="oc-num">#${o.orderNumber}</span>
+        <span class="oc-table">T${o.tableNumber}</span>
+        <span class="badge badge-${STATUS_COLORS[o.status]||'grey'}">${STATUS_LABELS[o.status]||o.status}</span>
+        <span class="oc-time">${ts.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</span>
+      </div>
+      <div class="oc-items">${items}</div>
+      <div class="oc-foot">
+        <span class="oc-elapsed ${elClass}">⏱ ${elapsed}m</span>${btns}
+      </div>`;
+    con.appendChild(card);
+  });
+}
+
+// ══════════════════════════════════════════════
+// ★ RESERVATIONS
+// ══════════════════════════════════════════════
+function startResvListener() {
+  if (!db) return;
+  const today = new Date().toISOString().split('T')[0];
+  resvListener = db.collection('reservations')
+    .where('date','==', today)
+    .orderBy('reservationTs','asc')
+    .onSnapshot(snap => {
+      allReservations = snap.docs.map(d => ({ ...d.data(), _id:d.id }));
+      if (document.getElementById('panel-reservations').classList.contains('active')) {
+        renderReservations();
+      }
+    }, e => console.warn('resv listener:', e));
+}
+
+function setResvFilter(f) {
+  resvFilter = f;
+  document.querySelectorAll('#panel-reservations .fbtn').forEach(b => b.classList.remove('active'));
+  document.getElementById(`rf-${f}`)?.classList.add('active');
+  renderReservations();
+}
+
+function renderReservations() {
+  const con = document.getElementById('reservations-list');
+  if (!con) return;
+
+  const now  = new Date();
+  let   list = [...allReservations];
+
+  if (resvFilter === 'upcoming') {
+    list = list.filter(r => {
+      const ts = r.reservationTs?.seconds ? new Date(r.reservationTs.seconds*1000) : new Date(r.reservationTs);
+      return ts >= now && r.status !== 'cancelled';
+    });
+  }
+  if (resvFilter === 'confirmed') list = list.filter(r => r.status === 'confirmed');
+
+  if (!list.length) {
+    con.innerHTML = `<div class="empty-state"><div class="emoji">📅</div><h3>No reservations</h3><p>Today's reservations appear here</p></div>`;
+    return;
+  }
+
+  con.innerHTML = '';
+  list.forEach(r => {
+    const ts      = r.reservationTs?.seconds ? new Date(r.reservationTs.seconds*1000) : new Date(r.reservationTs);
+    const timeStr = ts.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+    const isPast  = ts < now;
+    const card    = document.createElement('div');
+    card.className = `resv-card ${r.status !== 'cancelled' && !isPast ? 'upcoming' : ''}`;
+    card.innerHTML = `
+      <div class="resv-head">
+        <span class="resv-name">👤 ${escHtml(r.customerName)}</span>
+        <span class="badge badge-${r.status==='confirmed'?'green':r.status==='cancelled'?'grey':'amber'}">${r.status}</span>
+        ${isPast ? '<span class="badge badge-grey">Past</span>' : ''}
+        <span class="resv-time">⏰ ${timeStr}</span>
+      </div>
+      <div class="resv-meta">
+        <span>🪑 Table <b>${r.tableNumber}</b></span>
+        <span>👥 <b>${r.guestCount}</b> guests</span>
+        <span>📞 <b>${escHtml(r.phone)}</b></span>
+        ${r.notes ? `<span>📝 ${escHtml(r.notes)}</span>` : ''}
+      </div>`;
+    con.appendChild(card);
+  });
+}
+
+// ══════════════════════════════════════════════
+// ★ UTILS
+// ══════════════════════════════════════════════
+function escHtml(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+let _toastTimer = null;
+function toast(msg, type='') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className   = 'show' + (type ? ' t-'+type : '');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => { el.className = ''; }, 3000);
+}
+</script>
+</body>
+</html>

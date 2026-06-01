@@ -462,17 +462,7 @@ function resetLoginBtn() {
 }
 
 // ── PRE-LOGIN SETTINGS (updates login modal name before user signs in) ─────
-(function preloadSettings() {
-  if (!db) return;
-  db.collection('settings').doc('global').get().then(snap => {
-    if (!snap.exists) return;
-    const name = snap.data().restaurantName;
-    if (name) {
-      const el = document.getElementById('login-logo');
-      if (el) el.textContent = name;
-    }
-  }).catch(() => {});
-})();
+startSettingsListener();
   
 // ── AUTH STATE ────────────────────────────────
 firebase.auth().onAuthStateChanged(async user => {
@@ -520,7 +510,6 @@ firebase.auth().onAuthStateChanged(async user => {
     document.getElementById('login-overlay').style.display = 'flex';
     if (ordersListener)   { ordersListener();   ordersListener = null; }
     if (callsListener)    { callsListener();     callsListener = null; }
-    if (settingsListener) { settingsListener();  settingsListener = null; }
     if (resvListener)     { resvListener();      resvListener = null; }
   }
 });
@@ -565,31 +554,38 @@ function tickTime() {
 }
 
 // ── SETTINGS LISTENER ─────────────────────────
+function applyRestaurantName(name) {
+  const restaurantName = name || localStorage.getItem('restaurantName') || 'Restaurant';
+
+  document.getElementById('login-logo').textContent = restaurantName;
+  document.getElementById('tb-brand').textContent = restaurantName;
+
+  document.title = restaurantName + ' - Waiter Portal';
+}
+
 function startSettingsListener() {
-  if (!db) return;
+  if (!db || settingsListener) return;
+
+  const cachedName = localStorage.getItem('restaurantName');
+  if (cachedName) applyRestaurantName(cachedName);
+
   settingsListener = db.collection('settings').doc('global').onSnapshot(snap => {
     if (!snap.exists) return;
+
     settings = { ...settings, ...snap.data() };
 
-    // Sync restaurant name in real time
-    const name = settings.restaurantName || 'Gristo';
-    document.getElementById('tb-brand').textContent   = name;
-    document.getElementById('login-logo').textContent = name;
-    document.title = name + ' — Waiter Portal';
+    if (settings.restaurantName) {
+      localStorage.setItem('restaurantName', settings.restaurantName);
+      applyRestaurantName(settings.restaurantName);
+    }
 
-    // Sync brand colors in real time
     if (settings.brandColors) {
       const applyTo = settings.applyBrandTo || 'both';
-      if (['waiter','both','all'].includes(applyTo)) {
+      if (['waiter', 'both', 'all'].includes(applyTo)) {
         applyBrandColors(settings.brandColors);
       }
     }
-
-    // Rebuild table grid if on tables tab
-    if (document.getElementById('panel-tables').classList.contains('active')) {
-      renderTableGrid();
-    }
-  });
+  }, err => console.warn('settings listener:', err));
 }
 
 function applyBrandColors(bc) {

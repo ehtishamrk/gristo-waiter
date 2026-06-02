@@ -849,21 +849,22 @@ function startOrdersListener() {
     .where('timestamp','>=', firebase.firestore.Timestamp.fromDate(cutoff))
     .where('orderType','==','dine_in')
     .orderBy('timestamp','asc')
-    .onSnapshot(snap => {
+.onSnapshot(snap => {
       allOrders = snap.docs.map(d => ({ ...d.data(), _id:d.id }))
-        const newlyReady = snap.docChanges().filter(change => {
-  if (change.type !== 'modified' && change.type !== 'added') return false;
-  const o = change.doc.data();
-  return o.orderType === 'dine_in' && o.status === 'ready' && !knownOrderIds.has(change.doc.id);
-});
-
-if (newlyReady.length && knownOrderIds.size > 0) {
-  playRinging();
-  toast(`${newlyReady.length} order${newlyReady.length > 1 ? 's' : ''} ready for service`, 'success');
-}
-
-snap.docs.forEach(d => knownOrderIds.add(d.id));
         .filter(o => !['completed','delivered','picked_up'].includes(o.status));
+
+      const newlyReady = snap.docChanges().filter(change => {
+        if (change.type !== 'modified' && change.type !== 'added') return false;
+        const o = change.doc.data();
+        return o.orderType === 'dine_in' && o.status === 'ready' && !knownOrderIds.has(change.doc.id);
+      });
+
+      if (newlyReady.length && knownOrderIds.size > 0) {
+        playRinging();
+        toast(`${newlyReady.length} order${newlyReady.length > 1 ? 's' : ''} ready for service`, 'success');
+      }
+
+      snap.docs.forEach(d => knownOrderIds.add(d.id));
 
       // Badge for ready orders
       const readyCount = allOrders.filter(o => o.status === 'ready').length;

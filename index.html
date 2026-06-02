@@ -710,8 +710,7 @@ function startCallsListener() {
         badge.style.display = ringing.length ? 'inline-flex' : 'none';
       }
 
-      // Show ring alert for first unacknowledged call not yet shown
-const myTables = (currentEmployee?.assignedTables) || null;
+// Show ring alert for first unacknowledged call not yet shown
       const newCall = snap.docChanges().find(c => {
         if (c.type !== 'added' || _knownCallIds.has(c.doc.id) || c.doc.data().acknowledged) return false;
         if (myTables && myTables.length && !myTables.includes(c.doc.data().tableNumber)) return false;
@@ -775,6 +774,19 @@ function startRinging() {
 }
 
 function playRingChime() {
+  try {
+    const customB64 = localStorage.getItem('hx_sound_custom_b64');
+    if (customB64) {
+      const audio = new Audio(customB64);
+      audio.volume = 1.0;
+      audio.play().catch(() => _playDefaultChime());
+    } else {
+      _playDefaultChime();
+    }
+  } catch(e) {}
+}
+
+function _playDefaultChime() {
   try {
     const ctx  = new (window.AudioContext || window.webkitAudioContext)();
     const freqs = [880, 660, 880, 660];

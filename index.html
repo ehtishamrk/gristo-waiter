@@ -548,6 +548,10 @@ firebase.auth().onAuthStateChanged(async user => {
     if (ordersListener)   { ordersListener();   ordersListener = null; }
     if (callsListener)    { callsListener();     callsListener = null; }
     if (resvListener)     { resvListener();      resvListener = null; }
+    if (staffNotificationsListener) {
+  staffNotificationsListener();
+  staffNotificationsListener = null;
+}
   }
 });
 

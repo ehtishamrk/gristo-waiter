@@ -697,7 +697,13 @@ function startCallsListener() {
     .where('calledAt', '>=', firebase.firestore.Timestamp.fromDate(cutoff))
     .where('status', '==', 'ringing')
     .onSnapshot(snap => {
-      const ringing = snap.docs.filter(d => d.data().acknowledged === false);
+      const myTables = (currentEmployee?.assignedTables) || null; // null = all tables
+      const ringing = snap.docs.filter(d => {
+        const data = d.data();
+        if (data.acknowledged) return false;
+        if (myTables && myTables.length && !myTables.includes(data.tableNumber)) return false;
+        return true;
+      });
       const badge   = document.getElementById('calls-badge');
       if (badge) {
         badge.textContent  = ringing.length;
@@ -705,9 +711,12 @@ function startCallsListener() {
       }
 
       // Show ring alert for first unacknowledged call not yet shown
-      const newCall = snap.docChanges().find(c =>
-        c.type === 'added' && !_knownCallIds.has(c.doc.id) && !c.doc.data().acknowledged
-      );
+const myTables = (currentEmployee?.assignedTables) || null;
+      const newCall = snap.docChanges().find(c => {
+        if (c.type !== 'added' || _knownCallIds.has(c.doc.id) || c.doc.data().acknowledged) return false;
+        if (myTables && myTables.length && !myTables.includes(c.doc.data().tableNumber)) return false;
+        return true;
+      });
       if (newCall) {
         _knownCallIds.add(newCall.doc.id);
         showCallAlert(newCall.doc.id, newCall.doc.data());

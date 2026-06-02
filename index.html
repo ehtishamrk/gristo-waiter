@@ -697,11 +697,11 @@ function startCallsListener() {
     .where('calledAt', '>=', firebase.firestore.Timestamp.fromDate(cutoff))
     .where('status', '==', 'ringing')
     .onSnapshot(snap => {
-      const myTables = (currentEmployee?.assignedTables) || null; // null = all tables
+      const assignedTables = (currentEmployee?.assignedTables) || null; // null = all tables
       const ringing = snap.docs.filter(d => {
         const data = d.data();
         if (data.acknowledged) return false;
-        if (myTables && myTables.length && !myTables.includes(data.tableNumber)) return false;
+        if (assignedTables && assignedTables.length && !assignedTables.includes(data.tableNumber)) return false;
         return true;
       });
       const badge   = document.getElementById('calls-badge');

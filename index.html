@@ -697,25 +697,30 @@ function startCallsListener() {
     .where('calledAt', '>=', firebase.firestore.Timestamp.fromDate(cutoff))
     .where('status', '==', 'ringing')
     .onSnapshot(snap => {
-      const assignedTables = (currentEmployee?.assignedTables) || null; // null = all tables
+      const assignedTables = (currentEmployee?.assignedTables) || null;
       const ringing = snap.docs.filter(d => {
         const data = d.data();
         if (data.acknowledged) return false;
         if (assignedTables && assignedTables.length && !assignedTables.includes(data.tableNumber)) return false;
         return true;
       });
-      const badge   = document.getElementById('calls-badge');
+
+      const badge = document.getElementById('calls-badge');
       if (badge) {
-        badge.textContent  = ringing.length;
+        badge.textContent   = ringing.length;
         badge.style.display = ringing.length ? 'inline-flex' : 'none';
       }
 
-// Show ring alert for first unacknowledged call not yet shown
+      // Show ring alert for newly added unacknowledged calls
       const newCall = snap.docChanges().find(c => {
         if (c.type !== 'added' || _knownCallIds.has(c.doc.id) || c.doc.data().acknowledged) return false;
-        if (myTables && myTables.length && !myTables.includes(c.doc.data().tableNumber)) return false;
+        // Check if this call targets this waiter (by uid or no targetUid = broadcast)
+        const targetUid = c.doc.data().targetUid;
+        if (targetUid && currentUser && targetUid !== currentUser.uid) return false;
+        if (assignedTables && assignedTables.length && !assignedTables.includes(c.doc.data().tableNumber)) return false;
         return true;
       });
+
       if (newCall) {
         _knownCallIds.add(newCall.doc.id);
         showCallAlert(newCall.doc.id, newCall.doc.data());
@@ -723,7 +728,6 @@ function startCallsListener() {
 
       snap.docs.forEach(d => _knownCallIds.add(d.id));
 
-      // If current ringing call was acknowledged by someone else, stop ringing
       if (activeCallId) {
         const stillRinging = snap.docs.find(d => d.id === activeCallId && !d.data().acknowledged);
         if (!stillRinging) stopRinging();
@@ -881,7 +885,7 @@ function startOrdersListener() {
       });
 
       if (newlyReady.length && knownOrderIds.size > 0) {
-        playRinging();
+        playRingChime();
         toast(`${newlyReady.length} order${newlyReady.length > 1 ? 's' : ''} ready for service`, 'success');
       }
 
@@ -1172,7 +1176,7 @@ function startStaffNotificationsListener() {
 
       incoming.forEach(n => {
         if (knownStaffNotifIds.size > 0 && !knownStaffNotifIds.has(n._id) && !n.read) {
-          playRinging();
+          playRingChime();
           toast(n.title || 'New notification', 'success');
         }
       });

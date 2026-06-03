@@ -693,15 +693,18 @@ function startCallsListener() {
   if (!db) return;
   const cutoff = new Date(); cutoff.setHours(0,0,0,0);
 
-  callsListener = db.collection('waiter_calls')
+  callsListener = db.collection('staff_calls')
+    .where('type',     '==', 'admin_to_waiter')
+    .where('status',   '==', 'ringing')
     .where('calledAt', '>=', firebase.firestore.Timestamp.fromDate(cutoff))
-    .where('status', '==', 'ringing')
     .onSnapshot(snap => {
-      const assignedTables = (currentEmployee?.assignedTables) || null;
+      const assignedTables = currentEmployee?.assignedTables || null;
+
       const ringing = snap.docs.filter(d => {
         const data = d.data();
         if (data.acknowledged) return false;
-        if (assignedTables && assignedTables.length && !assignedTables.includes(data.tableNumber)) return false;
+        // If call targets a specific uid, filter to only that waiter
+        if (data.targetUid && currentUser && data.targetUid !== currentUser.uid) return false;
         return true;
       });
 
@@ -711,13 +714,13 @@ function startCallsListener() {
         badge.style.display = ringing.length ? 'inline-flex' : 'none';
       }
 
-      // Show ring alert for newly added unacknowledged calls
+      // Trigger ring alert for new calls
       const newCall = snap.docChanges().find(c => {
-        if (c.type !== 'added' || _knownCallIds.has(c.doc.id) || c.doc.data().acknowledged) return false;
-        // Check if this call targets this waiter (by uid or no targetUid = broadcast)
-        const targetUid = c.doc.data().targetUid;
-        if (targetUid && currentUser && targetUid !== currentUser.uid) return false;
-        if (assignedTables && assignedTables.length && !assignedTables.includes(c.doc.data().tableNumber)) return false;
+        if (c.type !== 'added') return false;
+        if (_knownCallIds.has(c.doc.id)) return false;
+        const data = c.doc.data();
+        if (data.acknowledged) return false;
+        if (data.targetUid && currentUser && data.targetUid !== currentUser.uid) return false;
         return true;
       });
 
@@ -752,7 +755,7 @@ function showCallAlert(callId, callData) {
 async function acknowledgeCall() {
   if (!activeCallId || !db) return;
   try {
-    await db.collection('waiter_calls').doc(activeCallId).update({
+    await db.collection('staff_calls').doc(activeCallId).update({
       status:         'acknowledged',
       acknowledged:   true,
       acknowledgedBy: currentEmployee?.name || 'Waiter',
@@ -813,7 +816,7 @@ function renderCallList() {
   const con = document.getElementById('calls-list');
   if (!con || !db) return;
   const cutoff = new Date(); cutoff.setHours(0,0,0,0);
-  db.collection('waiter_calls')
+  db.collection('staff_calls')
     .where('calledAt','>=', firebase.firestore.Timestamp.fromDate(cutoff))
     .orderBy('calledAt','desc')
     .get()
@@ -846,7 +849,7 @@ function renderCallList() {
 
 async function manualAck(callId) {
   if (!db) return;
-  await db.collection('waiter_calls').doc(callId).update({
+  await db.collection('staff_calls').doc(callId).update({
     status:'acknowledged', acknowledged:true,
     acknowledgedBy: currentEmployee?.name || 'Waiter',
     acknowledgedAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -855,7 +858,7 @@ async function manualAck(callId) {
 
 async function clearDoneCalls() {
   if (!db) return;
-  const snap = await db.collection('waiter_calls').where('acknowledged','==',true).get();
+  const snap = await db.collection('staff_calls').where('acknowledged','==',true).get();
   const batch = db.batch();
   snap.docs.forEach(d => batch.delete(d.ref));
   await batch.commit().catch(e => console.warn(e));

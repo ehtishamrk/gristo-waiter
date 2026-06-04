@@ -698,13 +698,17 @@ function startCallsListener() {
     .where('status',   '==', 'ringing')
     .where('calledAt', '>=', firebase.firestore.Timestamp.fromDate(cutoff))
     .onSnapshot(snap => {
-      const assignedTables = currentEmployee?.assignedTables || null;
+  const assignedTables = currentEmployee?.assignedTables || null;
 
       const ringing = snap.docs.filter(d => {
         const data = d.data();
         if (data.acknowledged) return false;
-        // If call targets a specific uid, filter to only that waiter
+        // If call targets a specific uid, only that waiter
         if (data.targetUid && currentUser && data.targetUid !== currentUser.uid) return false;
+        // If this waiter has assigned tables, only show calls for those tables
+        if (assignedTables && assignedTables.length > 0 && data.tableNumber) {
+          if (!assignedTables.map(String).includes(String(data.tableNumber))) return false;
+        }
         return true;
       });
 
@@ -715,12 +719,15 @@ function startCallsListener() {
       }
 
       // Trigger ring alert for new calls
-      const newCall = snap.docChanges().find(c => {
+const newCall = snap.docChanges().find(c => {
         if (c.type !== 'added') return false;
         if (_knownCallIds.has(c.doc.id)) return false;
         const data = c.doc.data();
         if (data.acknowledged) return false;
         if (data.targetUid && currentUser && data.targetUid !== currentUser.uid) return false;
+        if (assignedTables && assignedTables.length > 0 && data.tableNumber) {
+          if (!assignedTables.map(String).includes(String(data.tableNumber))) return false;
+        }
         return true;
       });
 
@@ -879,7 +886,17 @@ function startOrdersListener() {
     .orderBy('timestamp','asc')
 .onSnapshot(snap => {
       allOrders = snap.docs.map(d => ({ ...d.data(), _id:d.id }))
-        .filter(o => !['completed','delivered','picked_up'].includes(o.status));
+        .onSnapshot(snap => {
+      const assignedTables = currentEmployee?.assignedTables;
+      allOrders = snap.docs.map(d => ({ ...d.data(), _id:d.id }))
+        .filter(o => {
+          if (['completed','delivered','picked_up'].includes(o.status)) return false;
+          // If this waiter has assigned tables, only show orders from those tables
+          if (assignedTables && assignedTables.length > 0) {
+            return assignedTables.map(String).includes(String(o.tableNumber));
+          }
+          return true; // no table restriction — show all
+        });
 
       const newlyReady = snap.docChanges().filter(change => {
         if (change.type !== 'modified' && change.type !== 'added') return false;
@@ -1007,8 +1024,13 @@ function renderTableGrid() {
     }
   });
 
+const assignedTables = currentEmployee?.assignedTables;
+  const tablesToShow = (assignedTables && assignedTables.length > 0)
+    ? assignedTables.map(Number).sort((a,b) => a - b)
+    : Array.from({ length: count }, (_, i) => i + 1);
+
   let html = `<div class="table-grid">`;
-  for (let i = 1; i <= count; i++) {
+  for (const i of tablesToShow) {
     const status = tableMap[i];
     let tileClass = 'table-tile free';
     let label     = 'Free';
@@ -1169,13 +1191,14 @@ function startStaffNotificationsListener() {
     .orderBy('createdAt', 'desc')
     .limit(100)
     .onSnapshot(snap => {
-      const incoming = snap.docs
+const incoming = snap.docs
         .map(d => ({ ...d.data(), _id: d.id }))
-        .filter(n =>
-          n.toUid === currentUser.uid ||
-          n.role === 'waiter' ||
-          n.role === 'all'
-        );
+        .filter(n => {
+          // Targeted to this specific user — always show
+          if (n.toUid) return n.toUid === currentUser.uid;
+          // Broadcast to waiter role or everyone — show
+          return n.role === 'waiter' || n.role === 'all';
+        });
 
       incoming.forEach(n => {
         if (knownStaffNotifIds.size > 0 && !knownStaffNotifIds.has(n._id) && !n.read) {

@@ -885,8 +885,6 @@ function startOrdersListener() {
     .where('orderType','==','dine_in')
     .orderBy('timestamp','asc')
 .onSnapshot(snap => {
-      allOrders = snap.docs.map(d => ({ ...d.data(), _id:d.id }))
-        .onSnapshot(snap => {
       const assignedTables = currentEmployee?.assignedTables;
       allOrders = snap.docs.map(d => ({ ...d.data(), _id:d.id }))
         .filter(o => {

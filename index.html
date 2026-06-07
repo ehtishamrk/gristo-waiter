@@ -537,6 +537,7 @@ const empSnap = await db.collection('employees').doc(user.uid).get();
     document.getElementById('login-overlay').style.display  = 'none';
     document.getElementById('waiter-app').style.display     = 'flex';
     initWaiterApp();
+    startIdleWatcher(waiterLogout);
 
     // Real-time freeze check — kicks out immediately if frozen
     db.collection('employee_roles').doc(hash).onSnapshot(snap => {
@@ -574,6 +575,7 @@ function writePresence(online) {
 }
 
 function waiterLogout() {
+  stopIdleWatcher();
   writePresence(false);
   stopRinging();
   resetPortalLoginAfterLogout();
@@ -597,6 +599,40 @@ function showFreezeAlert() {
   document.body.appendChild(overlay);
 }
 
+// ── IDLE / TAB-CLOSE WATCHER ──────────────────
+let _idleTimer = null;
+let _tabHideTimer = null;
+const IDLE_MS = 30 * 60 * 1000; // 30 minutes
+
+function startIdleWatcher(logoutFn) {
+  const _logout = logoutFn;
+
+  function resetIdle() {
+    clearTimeout(_idleTimer);
+    _idleTimer = setTimeout(() => _logout(), IDLE_MS);
+  }
+
+  ['mousemove','mousedown','keydown','touchstart','scroll','click'].forEach(evt => {
+    document.addEventListener(evt, resetIdle, { passive: true });
+  });
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      _tabHideTimer = setTimeout(() => _logout(), 15000);
+    } else {
+      clearTimeout(_tabHideTimer);
+      resetIdle();
+    }
+  });
+
+  resetIdle();
+}
+
+function stopIdleWatcher() {
+  clearTimeout(_idleTimer);
+  clearTimeout(_tabHideTimer);
+}
+  
 // ── INIT ──────────────────────────────────────
 function initWaiterApp() {
   tickTime();

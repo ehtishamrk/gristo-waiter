@@ -524,16 +524,17 @@ firebase.auth().onAuthStateChanged(async user => {
 const empSnap = await db.collection('employees').doc(user.uid).get();
     currentEmployee = empSnap.exists ? empSnap.data() : { name: user.email, role:'waiter' };
 
+if (window._sessionUnsub) { window._sessionUnsub(); window._sessionUnsub = null; }
     const _sessionToken = 'w-' + Date.now() + '-' + Math.random().toString(36).slice(2,8);
     await db.collection('employees').doc(user.uid).set({ sessionToken: _sessionToken }, { merge: true });
-    db.collection('employees').doc(user.uid).onSnapshot(snap => {
+    window._sessionUnsub = db.collection('employees').doc(user.uid).onSnapshot(snap => {
       if (!snap.exists) return;
       if (snap.data().sessionToken !== _sessionToken) {
+        window._sessionUnsub = null;
         firebase.auth().signOut();
         showSessionKickedAlert();
       }
     });
-
     writePresence(true);
     window.addEventListener('beforeunload', () => writePresence(false));
 
@@ -578,6 +579,7 @@ function writePresence(online) {
 }
 
 function waiterLogout() {
+  if (window._sessionUnsub) { window._sessionUnsub(); window._sessionUnsub = null; }
   stopIdleWatcher();
   writePresence(false);
   stopRinging();
@@ -605,9 +607,16 @@ function showFreezeAlert() {
 // ── IDLE / TAB-CLOSE WATCHER ──────────────────
 let _idleTimer = null;
 let _tabHideTimer = null;
+let _watcherStarted = false;
 const IDLE_MS = 30 * 60 * 1000; // 30 minutes
 
 function startIdleWatcher(logoutFn) {
+  if (_watcherStarted) {
+    clearTimeout(_idleTimer);
+    _idleTimer = setTimeout(() => logoutFn(), IDLE_MS);
+    return;
+  }
+  _watcherStarted = true;
   const _logout = logoutFn;
 
   function resetIdle() {
@@ -621,7 +630,7 @@ function startIdleWatcher(logoutFn) {
 
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
-      _tabHideTimer = setTimeout(() => _logout(), 15000);
+      _tabHideTimer = setTimeout(() => _logout(), 5 * 60 * 1000);
     } else {
       clearTimeout(_tabHideTimer);
       resetIdle();
@@ -634,8 +643,8 @@ function startIdleWatcher(logoutFn) {
 function stopIdleWatcher() {
   clearTimeout(_idleTimer);
   clearTimeout(_tabHideTimer);
+  _watcherStarted = false;
 }
-  
 // ── INIT ──────────────────────────────────────
 function initWaiterApp() {
   tickTime();

@@ -1140,10 +1140,10 @@ function setOrderFilter(f) {
 // ── ORDER EDIT PERMISSION ─────────────────────
 function canEditOrder(order) {
   if (!settings.orderEditWaiter) return false;
-  const window = (settings.orderEditWindow ?? 10) * 60 * 1000;
-  if (window === 0) return false;
+  const editWin = (settings.orderEditWindow ?? 10) * 60 * 1000;
+  if (editWin === 0) return false;
   const ts = order.timestamp?.seconds ? order.timestamp.seconds * 1000 : Date.now();
-  return (Date.now() - ts) <= window;
+  return (Date.now() - ts) <= editWin;
 }
 
 async function waiterVoidItem(orderId, itemIndex) {

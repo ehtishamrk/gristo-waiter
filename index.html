@@ -1098,6 +1098,41 @@ function setOrderFilter(f) {
   renderOrders();
 }
 
+// ── ORDER EDIT PERMISSION ─────────────────────
+function canEditOrder(order) {
+  if (!settings.orderEditWaiter) return false;
+  const window = (settings.orderEditWindow ?? 10) * 60 * 1000;
+  if (window === 0) return false;
+  const ts = order.timestamp?.seconds ? order.timestamp.seconds * 1000 : Date.now();
+  return (Date.now() - ts) <= window;
+}
+
+async function waiterVoidItem(orderId, itemIndex) {
+  const order = allOrders.find(o => o._id === orderId);
+  if (!order) return;
+  if (!canEditOrder(order)) { toast('Order is locked for editing', 'error'); return; }
+
+  const items = [...(order.items || [])];
+  if (!items[itemIndex]) return;
+  const item = items[itemIndex];
+  if (item.voided) { toast('Item already voided', 'error'); return; }
+
+  items[itemIndex] = { ...item, voided: true, voidedBy: currentEmployee?.name || 'Waiter', voidedAt: Date.now() };
+  const newTotal = items.filter(i => !i.voided).reduce((s, i) => s + (i.unitPrice || i.price || 0) * (i.qty || 1), 0);
+
+  await db.collection('orders').doc(orderId).update({
+    items,
+    total: newTotal,
+    editLog: firebase.firestore.FieldValue.arrayUnion({
+      time: new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}),
+      reason: `Item voided: ${item.name}`,
+      by: currentEmployee?.name || 'Waiter'
+    }),
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+  }).catch(e => console.warn(e));
+  toast(`${item.name} voided`, 'success');
+}
+  
 function renderOrders() {
   const con = document.getElementById('orders-list');
   if (!con) return;
@@ -1121,20 +1156,22 @@ function renderOrders() {
     const card = document.createElement('div');
     card.className = `order-card status-${o.status}${isUrgent ? ' urgent' : ''}`;
 
-    const items = (o.items||[]).map(i =>
-      `<div class="oc-item-row">
+const items = (o.items||[]).map((i, idx) =>
+      `<div class="oc-item-row${i.voided ? '" style="opacity:.4;text-decoration:line-through' : ''}">
         <div class="oc-qty">${i.qty||1}</div>
-        <div class="oc-item-name">${escHtml(i.name)}</div>
+        <div class="oc-item-name">${escHtml(i.name)}${i.note?`<div class="oc-item-note">📝 ${escHtml(i.note)}</div>`:''}</div>
+        ${editable && !i.voided ? `<button onclick="waiterVoidItem('${o._id}',${idx})" style="margin-left:auto;background:none;border:none;color:var(--red);cursor:pointer;font-size:11px;padding:2px 6px;" title="Void item">✕</button>` : ''}
       </div>`
     ).join('');
 
-    let btns = '';
+let btns = '';
     if (o.status === 'ready') {
       btns = `<button class="sbtn sbtn-serve" onclick="markServed('${o._id}')">✓ Mark Served</button>`;
     }
     if (o.status === 'served') {
       btns = `<button class="sbtn sbtn-done" onclick="markFinished('${o._id}')">✓ Table Done</button>`;
     }
+    const editable = canEditOrder(o);
 
     card.innerHTML = `
       <div class="oc-head">

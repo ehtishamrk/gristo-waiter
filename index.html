@@ -323,6 +323,10 @@ body { background:var(--bg); color:var(--text); font-family:'DM Sans',sans-serif
       <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M10 3a5 5 0 015 5v3l1.5 2.5H3.5L5 11V8a5 5 0 015-5z"/><path d="M8.5 16a1.5 1.5 0 003 0"/></svg>
       Alerts <span class="tab-badge" id="notifications-badge" style="display:none">0</span>
     </button>
+  <button class="nav-tab" id="tab-create-order-btn" onclick="switchTab('create-order')">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M10 4v12M4 10h12"/></svg>
+      New Order
+    </button>
     <button class="nav-tab" id="tab-profile-btn" onclick="openProfile()">
       <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="10" cy="7" r="3.5"/><path d="M3 17c0-3.3 3.1-6 7-6s7 2.7 7 6" stroke-linecap="round"/></svg>
       My Profile
@@ -393,6 +397,32 @@ body { background:var(--bg); color:var(--text); font-family:'DM Sans',sans-serif
   <button class="btn-acknowledge" onclick="acknowledgeCall()">✓ Acknowledge</button>
 </div>
 
+<!-- CREATE ORDER PANEL -->
+<div class="panel" id="panel-create-order">
+  <div class="page-hd">
+    <div class="page-title">New Order</div>
+  </div>
+
+  <div style="margin-bottom:16px;">
+    <label class="fl">Table</label>
+    <select class="fi" id="co-table" style="max-width:180px;">
+      <option value="">Select table…</option>
+    </select>
+  </div>
+
+  <div id="co-menu-wrap" style="margin-bottom:16px;">
+    <div class="spinner"></div>
+  </div>
+
+  <div id="co-cart" style="margin-bottom:16px;"></div>
+
+  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+    <button class="btn btn-gold" onclick="submitWaiterOrder()">Place Order</button>
+    <button class="btn btn-ghost btn-sm" onclick="clearWaiterCart()">Clear</button>
+    <span id="co-total" style="font-size:14px;font-weight:700;color:var(--gold);"></span>
+  </div>
+</div>
+  
 <!-- PROFILE DRAWER -->
 <div id="profile-drawer">
   <div id="profile-backdrop" onclick="closeProfile()"></div>
@@ -748,6 +778,8 @@ function initWaiterApp() {
   startOrdersListener();
   startResvListener();
   startStaffNotificationsListener();
+  populateOrderTableSelect();
+  loadMenuForOrdering();
 }
 
 function tickTime() {
@@ -851,6 +883,7 @@ function switchTab(t) {
   document.getElementById(`tab-${t}-btn`).classList.add('active');
   if (t === 'orders')       renderOrders();
   if (t === 'tables')       renderTableGrid();
+  if (t === 'create-order') { populateOrderTableSelect(); renderOrderMenu(); }
   if (t === 'reservations') renderReservations();
   if (t === 'calls')        renderCallList();
   if (t === 'notifications') renderStaffNotifications();
@@ -1060,7 +1093,7 @@ function startOrdersListener() {
       const assignedTables = currentEmployee?.assignedTables;
       allOrders = snap.docs.map(d => ({ ...d.data(), _id:d.id }))
         .filter(o => {
-          if (['completed','delivered','picked_up'].includes(o.status)) return false;
+          if (['completed','delivered','picked_up','served'].includes(o.status)) return false;
           // If this waiter has assigned tables, only show orders from those tables
           if (assignedTables && assignedTables.length > 0) {
             return assignedTables.map(String).includes(String(o.tableNumber));
@@ -1239,10 +1272,13 @@ const assignedTables = currentEmployee?.assignedTables;
   let html = `<div class="table-grid">`;
   for (const i of tablesToShow) {
     const status = tableMap[i];
-    let tileClass = 'table-tile free';
+let tileClass = 'table-tile free';
     let label     = 'Free';
-    if (status === 'ready')     { tileClass = 'table-tile ready';    label = 'Ready!'; }
-    else if (status)            { tileClass = 'table-tile occupied'; label = status.replace('_',' '); }
+    if (status === 'ready')       { tileClass = 'table-tile ready';    label = 'Ready!'; }
+    else if (status === 'received' || status === 'confirmed' || status === 'preparing') {
+      tileClass = 'table-tile occupied'; label = status.replace('_', ' ');
+    }
+    // served/completed = free (already filtered out of allOrders)
     html += `
       <div class="${tileClass}" onclick="filterByTable(${i})">
         <div class="table-num">${i}</div>
@@ -1487,6 +1523,141 @@ function toast(msg, type='') {
   clearTimeout(_toastTimer);
   _toastTimer = setTimeout(() => { el.className = ''; }, 3000);
 }
+
+  // ── WAITER CREATE ORDER ────────────────────────
+let waiterCart = []; // [{...menuItem, qty}]
+
+function populateOrderTableSelect() {
+  const sel = document.getElementById('co-table');
+  if (!sel) return;
+  const assigned = currentEmployee?.assignedTables;
+  const count    = settings.tableCount || 10;
+  const tables   = (assigned && assigned.length > 0)
+    ? assigned.map(Number).sort((a,b)=>a-b)
+    : Array.from({length:count},(_,i)=>i+1);
+  sel.innerHTML = `<option value="">Select table…</option>` +
+    tables.map(t => `<option value="${t}">Table ${t}</option>`).join('');
+}
+
+let _waiterMenuItems = [];
+function loadMenuForOrdering() {
+  db.collection('menu_items').onSnapshot(snap => {
+    _waiterMenuItems = snap.docs.map(d => ({...d.data(), _id:d.id}))
+      .filter(i => i.avail !== false)
+      .sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+    if (document.getElementById('panel-create-order').classList.contains('active')) {
+      renderOrderMenu();
+    }
+  });
+}
+
+function renderOrderMenu() {
+  const wrap = document.getElementById('co-menu-wrap');
+  if (!wrap) return;
+  if (!_waiterMenuItems.length) {
+    wrap.innerHTML = `<div class="empty-state"><h3>No menu items available</h3></div>`;
+    return;
+  }
+  // Group by category
+  const groups = {};
+  _waiterMenuItems.forEach(i => {
+    const cat = i.cat || i.category || 'Other';
+    if (!groups[cat]) groups[cat] = [];
+    groups[cat].push(i);
+  });
+  wrap.innerHTML = Object.entries(groups).map(([cat, items]) => `
+    <div style="margin-bottom:14px;">
+      <div style="font-size:11px;font-weight:700;color:var(--td);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;">${escHtml(cat)}</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;">
+        ${items.map(item => `
+          <div style="background:var(--s2);border:1px solid var(--bd);border-radius:var(--rs);padding:10px;cursor:pointer;" onclick="addToWaiterCart('${item._id}')">
+            <div style="font-size:13px;font-weight:600;">${escHtml(item.name||'')}</div>
+            <div style="font-size:12px;color:var(--gold);">${item.price ? (settings.currency||'$') + parseFloat(item.price).toFixed(2) : ''}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `).join('');
+}
+
+function addToWaiterCart(itemId) {
+  const item = _waiterMenuItems.find(i => i._id === itemId);
+  if (!item) return;
+  const existing = waiterCart.find(c => c._id === itemId);
+  if (existing) { existing.qty++; }
+  else { waiterCart.push({...item, qty: 1}); }
+  renderWaiterCart();
+}
+
+function renderWaiterCart() {
+  const con = document.getElementById('co-cart');
+  if (!con) return;
+  if (!waiterCart.length) { con.innerHTML = ''; document.getElementById('co-total').textContent = ''; return; }
+  const currency = settings.currency || '$';
+  let total = 0;
+  con.innerHTML = `
+    <div style="background:var(--s2);border:1px solid var(--bd);border-radius:var(--r);padding:12px;margin-bottom:4px;">
+      <div style="font-size:12px;font-weight:700;color:var(--td);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;">Cart</div>
+      ${waiterCart.map((i, idx) => {
+        const lineTotal = (parseFloat(i.price)||0) * i.qty;
+        total += lineTotal;
+        return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--bd);">
+          <span style="flex:1;font-size:13px;">${escHtml(i.name)}</span>
+          <button class="btn btn-ghost btn-sm" style="padding:0 8px;" onclick="changeCartQty(${idx},-1)">−</button>
+          <span style="min-width:20px;text-align:center;font-size:13px;">${i.qty}</span>
+          <button class="btn btn-ghost btn-sm" style="padding:0 8px;" onclick="changeCartQty(${idx},1)">+</button>
+          <span style="font-size:13px;color:var(--gold);min-width:55px;text-align:right;">${currency}${lineTotal.toFixed(2)}</span>
+        </div>`;
+      }).join('')}
+    </div>`;
+  document.getElementById('co-total').textContent = `Total: ${currency}${total.toFixed(2)}`;
+}
+
+function changeCartQty(idx, delta) {
+  waiterCart[idx].qty += delta;
+  if (waiterCart[idx].qty <= 0) waiterCart.splice(idx, 1);
+  renderWaiterCart();
+}
+
+function clearWaiterCart() {
+  waiterCart = [];
+  renderWaiterCart();
+}
+
+async function submitWaiterOrder() {
+  const tableNum = document.getElementById('co-table').value;
+  if (!tableNum) { toast('Select a table first', 'error'); return; }
+  if (!waiterCart.length) { toast('Add items to the cart', 'error'); return; }
+
+  const currency = settings.currency || '$';
+  const items = waiterCart.map(i => ({ name: i.name, qty: i.qty, price: parseFloat(i.price)||0, _id: i._id }));
+  const subtotal = items.reduce((s, i) => s + i.price * i.qty, 0);
+
+  const orderNum = 'W' + Date.now().toString().slice(-6);
+
+  try {
+    await db.collection('orders').add({
+      orderNumber:  orderNum,
+      orderType:    'dine_in',
+      tableNumber:  parseInt(tableNum),
+      items,
+      subtotal,
+      total:        subtotal,
+      status:       'received',
+      paymentStatus:'unpaid',
+      createdBy:    currentEmployee?.name || 'Waiter',
+      createdByUid: currentUser?.uid || '',
+      timestamp:    firebase.firestore.FieldValue.serverTimestamp(),
+      statusTimestamps: { received: firebase.firestore.FieldValue.serverTimestamp() }
+    });
+    toast(`Order #${orderNum} placed for Table ${tableNum}`, 'success');
+    clearWaiterCart();
+    document.getElementById('co-table').value = '';
+  } catch(e) {
+    toast('Error placing order: ' + e.message, 'error');
+  }
+}
+  
 </script>
 </body>
 </html>

@@ -1087,6 +1087,20 @@ function startOrdersListener() {
 
   ordersListener = db.collection('orders')
     .where('timestamp','>=', firebase.firestore.Timestamp.fromDate(cutoff))
+    .orderBy('timestamp','asc')
+    .onSnapshot(snap => {
+      const assignedTables = currentEmployee?.assignedTables;
+      allOrders = snap.docs.map(d => ({ ...d.data(), _id:d.id }))
+        .filter(o => {
+          if (o.orderType !== 'dine_in') return false; // waiter only handles dine-in
+          if (['completed','delivered','picked_up','served'].includes(o.status)) return false;
+          // If this waiter has assigned tables, only show orders from those tables
+          if (assignedTables && assignedTables.length > 0) {
+            return assignedTables.map(String).includes(String(o.tableNumber));
+          }
+          return true;
+        });
+    .where('timestamp','>=', firebase.firestore.Timestamp.fromDate(cutoff))
     .where('orderType','==','dine_in')
     .orderBy('timestamp','asc')
 .onSnapshot(snap => {

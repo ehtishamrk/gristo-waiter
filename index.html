@@ -198,6 +198,7 @@ body { background:var(--bg); color:var(--text); font-family:'DM Sans',sans-serif
 .table-tile.occupied { border-color:rgba(200,146,42,.4); background:var(--gold-d); }
 .table-tile.ready    { border-color:rgba(61,155,106,.4); background:var(--green-d); animation:urgentPulse 2s infinite; }
 .table-tile.free     { opacity:.4; }
+  .table-tile.served   { border-color: rgba(74,127,200,.5); background: var(--blue-d, rgba(74,127,200,.12)); }
 .table-num { font-family:'Cormorant Garamond',serif; font-size:24px; font-weight:700; margin-bottom:4px; }
 .table-status-label { font-size:10px; letter-spacing:1px; text-transform:uppercase; color:var(--td); }
 .table-tile.occupied .table-status-label { color:var(--gold); }
@@ -1083,10 +1084,11 @@ ordersListener = db.collection('orders')
     .orderBy('timestamp','asc')
     .onSnapshot(snap => {
       const assignedTables = currentEmployee?.assignedTables;
-      allOrders = snap.docs.map(d => ({ ...d.data(), _id:d.id }))
+allOrders = snap.docs.map(d => ({ ...d.data(), _id:d.id }))
         .filter(o => {
-          if (o.orderType !== 'dine_in') return false;
-          if (['completed','delivered','picked_up','served'].includes(o.status)) return false;
+          // Include dine_in orders OR any order with a table number assigned
+          if (o.orderType !== 'dine_in' && !o.tableNumber) return false;
+          if (['completed','delivered','picked_up','cleared'].includes(o.status)) return false;
           if (assignedTables && assignedTables.length > 0) {
             return assignedTables.map(String).includes(String(o.tableNumber));
           }
@@ -1193,7 +1195,7 @@ let btns = '';
       btns = `<button class="sbtn sbtn-serve" onclick="markServed('${o._id}')">✓ Mark Served</button>`;
     }
     if (o.status === 'served') {
-      btns = `<button class="sbtn sbtn-done" onclick="markFinished('${o._id}')">✓ Table Done</button>`;
+      btns = `<button class="sbtn sbtn-done" onclick="markFinished('${o._id}')">🧹 Clear Table</button>`;
     }
     const editable = canEditOrder(o);
 
@@ -1228,12 +1230,12 @@ async function markServed(id) {
 async function markFinished(id) {
   if (!db) return;
   await db.collection('orders').doc(id).update({
-    status: 'completed',
-    [`statusTimestamps.completed`]: firebase.firestore.FieldValue.serverTimestamp(),
-    completedBy: currentEmployee?.name || 'Waiter',
-    updatedAt:   firebase.firestore.FieldValue.serverTimestamp()
+    status: 'cleared',
+    [`statusTimestamps.cleared`]: firebase.firestore.FieldValue.serverTimestamp(),
+    clearedBy: currentEmployee?.name || 'Waiter',
+    updatedAt:  firebase.firestore.FieldValue.serverTimestamp()
   }).catch(e => console.warn(e));
-  toast('Table marked as done', 'success');
+  toast('Table cleared — ready for next guest', 'success');
 }
 
 // ══════════════════════════════════════════════
@@ -1265,11 +1267,12 @@ const assignedTables = currentEmployee?.assignedTables;
     const status = tableMap[i];
 let tileClass = 'table-tile free';
     let label     = 'Free';
-    if (status === 'ready')       { tileClass = 'table-tile ready';    label = 'Ready!'; }
+if (status === 'ready')     { tileClass = 'table-tile ready';    label = 'Ready!'; }
+    else if (status === 'served') { tileClass = 'table-tile served';   label = 'Served'; }
     else if (status === 'received' || status === 'confirmed' || status === 'preparing') {
       tileClass = 'table-tile occupied'; label = status.replace('_', ' ');
     }
-    // served/completed = free (already filtered out of allOrders)
+    // cleared/completed = free
     html += `
       <div class="${tileClass}" onclick="filterByTable(${i})">
         <div class="table-num">${i}</div>
@@ -1310,7 +1313,7 @@ function filterByTable(tableNum) {
     ).join('');
     let btns = '';
     if (o.status === 'ready')  btns = `<button class="sbtn sbtn-serve" onclick="markServed('${o._id}')">✓ Mark Served</button>`;
-    if (o.status === 'served') btns = `<button class="sbtn sbtn-done" onclick="markFinished('${o._id}')">✓ Table Done</button>`;
+    if (o.status === 'served') btns = `<button class="sbtn sbtn-done" onclick="markFinished('${o._id}')">🧹 Clear Table</button>`;
 
     const card = document.createElement('div');
     card.className = `order-card status-${o.status}`;
@@ -1532,13 +1535,18 @@ function populateOrderTableSelect() {
 
 let _waiterMenuItems = [];
 function loadMenuForOrdering() {
+  const wrap = document.getElementById('co-menu-wrap');
+  if (wrap) wrap.innerHTML = '<div class="spinner"></div>';
+
   db.collection('menu_items').onSnapshot(snap => {
     _waiterMenuItems = snap.docs.map(d => ({...d.data(), _id:d.id}))
       .filter(i => i.avail !== false)
-      .sort((a,b)=>(a.name||'').localeCompare(b.name||''));
-    if (document.getElementById('panel-create-order').classList.contains('active')) {
-      renderOrderMenu();
-    }
+      .sort((a,b) => (a.name||'').localeCompare(b.name||''));
+    // Always re-render — handles both initial load and real-time admin changes
+    renderOrderMenu();
+  }, e => {
+    const w = document.getElementById('co-menu-wrap');
+    if (w) w.innerHTML = `<div class="empty-state"><h3>Could not load menu</h3><p>${e.message}</p></div>`;
   });
 }
 

@@ -1077,34 +1077,19 @@ function startOrdersListener() {
   if (!db) return;
   const cutoff = new Date(); cutoff.setHours(0,0,0,0);
 
-  ordersListener = db.collection('orders')
+ordersListener = db.collection('orders')
     .where('timestamp','>=', firebase.firestore.Timestamp.fromDate(cutoff))
     .orderBy('timestamp','asc')
     .onSnapshot(snap => {
       const assignedTables = currentEmployee?.assignedTables;
       allOrders = snap.docs.map(d => ({ ...d.data(), _id:d.id }))
         .filter(o => {
-          if (o.orderType !== 'dine_in') return false; // waiter only handles dine-in
+          if (o.orderType !== 'dine_in') return false;
           if (['completed','delivered','picked_up','served'].includes(o.status)) return false;
-          // If this waiter has assigned tables, only show orders from those tables
           if (assignedTables && assignedTables.length > 0) {
             return assignedTables.map(String).includes(String(o.tableNumber));
           }
           return true;
-        });
-    .where('timestamp','>=', firebase.firestore.Timestamp.fromDate(cutoff))
-    .where('orderType','==','dine_in')
-    .orderBy('timestamp','asc')
-.onSnapshot(snap => {
-      const assignedTables = currentEmployee?.assignedTables;
-      allOrders = snap.docs.map(d => ({ ...d.data(), _id:d.id }))
-        .filter(o => {
-          if (['completed','delivered','picked_up','served'].includes(o.status)) return false;
-          // If this waiter has assigned tables, only show orders from those tables
-          if (assignedTables && assignedTables.length > 0) {
-            return assignedTables.map(String).includes(String(o.tableNumber));
-          }
-          return true; // no table restriction — show all
         });
 
       const newlyReady = snap.docChanges().filter(change => {
@@ -1120,7 +1105,6 @@ function startOrdersListener() {
 
       snap.docs.forEach(d => knownOrderIds.add(d.id));
 
-      // Badge for ready orders
       const readyCount = allOrders.filter(o => o.status === 'ready').length;
       const badge      = document.getElementById('orders-badge');
       if (badge) { badge.textContent = readyCount; badge.style.display = readyCount ? 'inline-flex' : 'none'; }
